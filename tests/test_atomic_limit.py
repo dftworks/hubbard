@@ -22,4 +22,3 @@ def test_atomic_limit_matrix_free() -> None:
         [U * double_occupancy_count(state) * value for state, value in zip(basis, vector)]
     )
     np.testing.assert_allclose(result, expected, atol=0.0)
-

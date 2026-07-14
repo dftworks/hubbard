@@ -87,4 +87,3 @@ def test_nearest_neighbor_and_periodic_hopping_signs() -> None:
     # For down spin the up block is crossed twice and cancels; the sign is set
     # by occupied down orbitals between sites 0 and 3.
     assert apply_spin_hop(state, 4, 3, 0, "down") == ((0b1010, 0b1010), -1)
-

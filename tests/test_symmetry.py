@@ -29,4 +29,3 @@ def test_open_chain_ground_state_has_reflection_symmetry() -> None:
     np.testing.assert_allclose(charge, charge[::-1], atol=1e-10)
     np.testing.assert_allclose(spin, spin[::-1, ::-1], atol=1e-10)
     assert result.residual_norm < 1e-8
-

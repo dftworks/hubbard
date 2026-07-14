@@ -69,4 +69,3 @@ def test_fourier_observable_sum_rules(ground_state) -> None:
 def test_observables_reject_zero_vector(ground_state) -> None:
     with pytest.raises(ValueError, match="nonzero"):
         local_charge(np.zeros(len(ground_state.basis)), ground_state.basis)
-

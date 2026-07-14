@@ -135,4 +135,3 @@ def plot_scan(
 
 if __name__ == "__main__":
     main()
-

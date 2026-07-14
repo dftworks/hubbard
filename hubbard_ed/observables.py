@@ -225,4 +225,3 @@ def _structure_factor(
         phase = np.exp(1j * momentum * (sites[:, None] - sites[None, :]))
         values[index] = float(np.real(np.sum(phase * correlations) / L))
     return momenta, values
-

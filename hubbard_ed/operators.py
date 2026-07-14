@@ -118,4 +118,3 @@ def apply_spin_hop(
         spin_orbital(L, destination_site, spin),
         spin_orbital(L, source_site, spin),
     )
-

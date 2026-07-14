@@ -26,4 +26,3 @@ def test_large_u_singlet_triplet_splitting(U: float) -> None:
     splitting = result.eigenvalues[1] - result.eigenvalues[0]
     assert splitting == pytest.approx(4.0 * t * t / U, rel=2e-3)
     assert np.all(result.residual_norms < 1e-11)
-

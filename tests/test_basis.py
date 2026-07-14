@@ -43,4 +43,3 @@ def test_missing_state_lookup() -> None:
     basis = HubbardBasis(3, 1, 1)
     with pytest.raises(KeyError, match="not in this particle-number sector"):
         basis.state_index((0b011, 0b001))
-

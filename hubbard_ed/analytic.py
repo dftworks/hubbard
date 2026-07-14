@@ -86,4 +86,3 @@ def noninteracting_ground_energy(
 
     energies = single_particle_energies(L, t=t, boundary=boundary)
     return float(np.sum(energies[:n_up]) + np.sum(energies[:n_down]))
-

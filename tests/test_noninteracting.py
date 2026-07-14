@@ -43,4 +43,3 @@ def test_noninteracting_iterative_ground_state_residual(boundary: str) -> None:
     expected = noninteracting_sector_energies(6, 3, 2, boundary=boundary)[:3]
     np.testing.assert_allclose(result.eigenvalues, expected, atol=1e-10)
     assert np.all(result.residual_norms < 1e-8)
-

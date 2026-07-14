@@ -114,4 +114,3 @@ class HubbardBasis:
             f"HubbardBasis(L={self.L}, n_up={self.n_up}, "
             f"n_down={self.n_down}, dimension={self.dimension})"
         )
-
