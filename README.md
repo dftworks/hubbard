@@ -88,6 +88,55 @@ The package also exposes `HubbardHamiltonian.to_sparse()`, `matvec()`, and
 `aslinearoperator()` separately, making it straightforward to test new state
 representations against the same reference action.
 
+## Arbitrary hopping matrices
+
+`HoppingMatrixHamiltonian` implements
+
+\[
+H(h)=\sum_{ij,\sigma}h_{ij}c^\dagger_{i\sigma}c_{j\sigma}
+     +U\sum_i n_{i\uparrow}n_{i\downarrow}.
+\]
+
+Here `h[i,j]` is the coefficient of `c_i^dagger c_j`.  The matrix must have
+shape `(L,L)`, contain finite values, and be Hermitian to numerical tolerance
+`1e-12`.  It may be real or complex, its diagonal represents spin-independent
+onsite potentials, and the same matrix is used for both spins.  The constructor
+copies the matrix and stores it read-only so later caller mutation cannot
+change a calculation.
+
+```python
+import numpy as np
+
+from hubbard_ed import (
+    HubbardBasis,
+    HoppingMatrixHamiltonian,
+    nearest_neighbor_hopping_matrix,
+    solve_hamiltonian,
+)
+
+L = 6
+basis = HubbardBasis(L, 3, 3)
+h = nearest_neighbor_hopping_matrix(L, t=1.0, boundary="open")
+h[0, 2] = h[2, 0] = -0.2        # next-nearest-neighbor edge
+h[np.diag_indices(L)] = 0.1      # onsite potential
+
+hamiltonian = HoppingMatrixHamiltonian(basis, h, U=4.0)
+result = solve_hamiltonian(hamiltonian)
+```
+
+Both `to_sparse()` and `matvec()` evaluate every nonzero `h[i,j]` through the
+same tested fermionic hopping primitive.  Complex Peierls phases and iterative
+complex-Hermitian solving are supported.  See `examples/custom_hopping.py` for
+a flux-threaded ring with next-nearest-neighbor hopping.
+
+An important orbital-rotation limitation is deliberate: rotating the
+single-particle basis also transforms the onsite Hubbard interaction into a
+general four-index two-body tensor.  Passing only a rotated `h` while retaining
+onsite `U` therefore describes a different interacting model, except at
+`U=0` or when the rotation preserves the local interaction.  A future general
+two-body operator is required for exact wavelet, natural-orbital, or learned
+orbital representations of the full interacting Hamiltonian.
+
 ## Observables and normalization
 
 The observable module implements:
@@ -123,7 +172,8 @@ The tests cover basis dimensions, fermionic anticommutators, explicit periodic
 hopping signs, Hermiticity, the analytic two-site energy, the full `U=0`
 many-body spectrum for both boundaries (including degeneracies), the atomic
 limit, large-`U` superexchange, symmetry checks, CSR versus matrix-free action,
-observable sum rules, and eigenpair residuals.
+observable sum rules, arbitrary real and complex hopping matrices, and
+eigenpair residuals.
 
 Run the small examples with:
 
@@ -131,6 +181,7 @@ Run the small examples with:
 python examples/two_site.py
 python examples/chain_scan.py --L 6
 python examples/chain_scan.py --L 8 --save-dir plots
+python examples/custom_hopping.py
 ```
 
 The scan prints `U/t`, `E0`, `E0/L`, double occupancy per site, and residual
@@ -159,6 +210,11 @@ because the basis tuple and reverse-lookup dictionary must still be stored.
 Matrix-free Lanczos avoids storing all CSR nonzeros and is therefore the path
 to the largest feasible sectors, but it does not remove basis storage or the
 cost of repeated Python-level hopping operations.
+
+A dense generic hopping matrix has up to `L^2` nonzero terms per spin, so its
+matrix-free action can be substantially slower than the nearest-neighbor chain
+even at the same Hilbert-space dimension.  Sparse physical hopping graphs are
+therefore preferable when using this reference implementation.
 
 The basis, elementary operators, Hamiltonian graph construction, and solver
 are separate modules so future orbital transformations, arbitrary hopping

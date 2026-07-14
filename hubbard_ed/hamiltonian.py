@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from math import isfinite
 from numbers import Real
 from typing import Iterator, Literal, TypeAlias
@@ -12,15 +11,17 @@ from numpy.typing import ArrayLike, NDArray
 from scipy.sparse import coo_matrix, csr_matrix
 from scipy.sparse.linalg import LinearOperator
 
-from .basis import BasisState, HubbardBasis
+from .basis import BasisState, HubbardBasis, validate_sector
 from .operators import Spin, apply_spin_hop
 
 Boundary = Literal["open", "periodic"]
 Matrix: TypeAlias = NDArray[np.float64] | NDArray[np.complex128]
+Scalar: TypeAlias = float | complex
 
 # A conservative default for explicit CSR construction.  Matrix-free solving
 # has a separate limit inherited from HubbardBasis.
 DEFAULT_MAX_CSR_DIMENSION = 250_000
+HERMITICITY_TOLERANCE = 1e-12
 
 
 def validate_boundary(boundary: str) -> Boundary:
@@ -46,11 +47,26 @@ def nearest_neighbor_bonds(L: int, boundary: Boundary) -> tuple[tuple[int, int],
     the convention used by the two-site analytic reference.
     """
 
+    validate_sector(L, 0, 0)
     validate_boundary(boundary)
     bonds = [(site, site + 1) for site in range(L - 1)]
     if boundary == "periodic" and L > 2:
         bonds.append((L - 1, 0))
     return tuple(bonds)
+
+
+def nearest_neighbor_hopping_matrix(
+    L: int, *, t: Real = 1.0, boundary: Boundary = "open"
+) -> NDArray[np.float64]:
+    """Return ``h`` for the chain kinetic term ``sum_ij h_ij c_i^dagger c_j``."""
+
+    validate_sector(L, 0, 0)
+    hopping = _validate_real("t", t)
+    matrix = np.zeros((L, L), dtype=float)
+    for site_a, site_b in nearest_neighbor_bonds(L, boundary):
+        matrix[site_a, site_b] = -hopping
+        matrix[site_b, site_a] = -hopping
+    return matrix
 
 
 def double_occupancy_count(state: BasisState) -> int:
@@ -59,50 +75,89 @@ def double_occupancy_count(state: BasisState) -> int:
     return (state[0] & state[1]).bit_count()
 
 
-@dataclass(frozen=True, slots=True)
-class HubbardHamiltonian:
-    """Hubbard Hamiltonian tied to a particular fixed-sector basis.
+def _validated_hopping_matrix(
+    hopping_matrix: ArrayLike, L: int
+) -> NDArray[np.float64] | NDArray[np.complex128]:
+    candidate = np.asarray(hopping_matrix)
+    if candidate.shape != (L, L):
+        raise ValueError(f"hopping_matrix must have shape ({L}, {L})")
+    if not np.issubdtype(candidate.dtype, np.number):
+        raise TypeError("hopping_matrix must contain numeric values")
+    dtype = np.result_type(candidate.dtype, np.float64)
+    matrix = np.array(candidate, dtype=dtype, copy=True)
+    if not np.all(np.isfinite(matrix)):
+        raise ValueError("hopping_matrix must contain only finite values")
+    if not np.allclose(
+        matrix,
+        matrix.conj().T,
+        rtol=HERMITICITY_TOLERANCE,
+        atol=HERMITICITY_TOLERANCE,
+    ):
+        maximum_error = float(np.max(np.abs(matrix - matrix.conj().T)))
+        raise ValueError(
+            "hopping_matrix must be Hermitian; maximum |h-h^dagger| is "
+            f"{maximum_error:.3e}"
+        )
+    # Accepted roundoff-level asymmetry is projected away so rmatvec=matvec and
+    # Hermitian eigensolvers remain exact properties of the stored operator.
+    matrix = 0.5 * (matrix + matrix.conj().T)
+    matrix.flags.writeable = False
+    return matrix
 
-    ``matvec`` applies the Hamiltonian directly from bit operations without
-    storing a sparse matrix.  ``to_sparse`` constructs the equivalent CSR
-    representation from the same hopping primitive.
+
+class HoppingMatrixHamiltonian:
+    """Fixed-sector Hubbard Hamiltonian for an arbitrary one-body matrix.
+
+    The convention is
+
+    ``H = sum_ij,sigma h[i,j] c_i,sigma^dagger c_j,sigma
+         + U sum_i n_i,up n_i,down``.
+
+    ``h`` must be finite and Hermitian, may be real or complex, and may contain
+    diagonal onsite terms.  It is copied and made read-only at construction.
+    The same matrix is applied to both spins.  Every nonzero matrix entry is
+    evaluated through :func:`hubbard_ed.operators.apply_spin_hop`, preserving
+    the package's global fermionic convention.
     """
 
-    basis: HubbardBasis
-    t: float = 1.0
-    U: float = 0.0
-    boundary: Boundary = "open"
-
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "t", _validate_real("t", self.t))
-        object.__setattr__(self, "U", _validate_real("U", self.U))
-        object.__setattr__(self, "boundary", validate_boundary(self.boundary))
+    def __init__(
+        self,
+        basis: HubbardBasis,
+        hopping_matrix: ArrayLike,
+        *,
+        U: Real = 0.0,
+    ) -> None:
+        if not isinstance(basis, HubbardBasis):
+            raise TypeError("basis must be a HubbardBasis")
+        self.basis = basis
+        self.U = _validate_real("U", U)
+        self.hopping_matrix = _validated_hopping_matrix(hopping_matrix, basis.L)
+        self.dtype = np.dtype(np.result_type(self.hopping_matrix.dtype, np.float64))
+        self._hopping_terms: tuple[tuple[int, int, Scalar], ...] = tuple(
+            (int(destination), int(source), self.hopping_matrix[destination, source].item())
+            for destination, source in zip(*np.nonzero(self.hopping_matrix))
+        )
 
     @property
     def shape(self) -> tuple[int, int]:
         return self.basis.dimension, self.basis.dimension
 
-    @property
-    def bonds(self) -> tuple[tuple[int, int], ...]:
-        return nearest_neighbor_bonds(self.basis.L, self.boundary)
-
     def _hopping_targets(
         self, state: BasisState
-    ) -> Iterator[tuple[BasisState, float]]:
-        for site_a, site_b in self.bonds:
-            for spin in ("up", "down"):
-                typed_spin: Spin = spin
-                for destination, source in ((site_a, site_b), (site_b, site_a)):
-                    result = apply_spin_hop(
-                        state,
-                        self.basis.L,
-                        destination,
-                        source,
-                        typed_spin,
-                    )
-                    if result is not None:
-                        target, sign = result
-                        yield target, -self.t * sign
+    ) -> Iterator[tuple[BasisState, Scalar]]:
+        spins: tuple[Spin, Spin] = ("up", "down")
+        for destination, source, matrix_element in self._hopping_terms:
+            for spin in spins:
+                result = apply_spin_hop(
+                    state,
+                    self.basis.L,
+                    destination,
+                    source,
+                    spin,
+                )
+                if result is not None:
+                    target, sign = result
+                    yield target, matrix_element * sign
 
     def matvec(self, vector: ArrayLike) -> Matrix:
         """Compute ``H @ vector`` without materializing ``H``."""
@@ -114,7 +169,7 @@ class HubbardHamiltonian:
             )
         if not np.issubdtype(x.dtype, np.number):
             raise TypeError("vector must contain numeric values")
-        dtype = np.result_type(x.dtype, np.float64)
+        dtype = np.result_type(x.dtype, self.dtype)
         y = np.zeros(self.basis.dimension, dtype=dtype)
 
         for column, state in enumerate(self.basis):
@@ -127,19 +182,19 @@ class HubbardHamiltonian:
         return y
 
     def aslinearoperator(self) -> LinearOperator:
-        """Expose the matrix-free action as a SciPy ``LinearOperator``."""
+        """Expose the Hermitian matrix-free action as a SciPy ``LinearOperator``."""
 
         return LinearOperator(
             shape=self.shape,
             matvec=self.matvec,
             rmatvec=self.matvec,
-            dtype=np.dtype(np.float64),
+            dtype=self.dtype,
         )
 
     def to_sparse(
         self, *, max_dimension: int | None = DEFAULT_MAX_CSR_DIMENSION
     ) -> csr_matrix:
-        """Construct the Hamiltonian as a real symmetric CSR matrix."""
+        """Construct the Hamiltonian as a Hermitian CSR matrix."""
 
         dimension = self.basis.dimension
         if max_dimension is not None and dimension > max_dimension:
@@ -151,7 +206,7 @@ class HubbardHamiltonian:
 
         rows: list[int] = []
         columns: list[int] = []
-        values: list[float] = []
+        values: list[Scalar] = []
         for column, state in enumerate(self.basis):
             diagonal = self.U * double_occupancy_count(state)
             if diagonal != 0.0:
@@ -164,11 +219,41 @@ class HubbardHamiltonian:
                 values.append(matrix_element)
 
         matrix = coo_matrix(
-            (values, (rows, columns)), shape=self.shape, dtype=np.float64
+            (values, (rows, columns)), shape=self.shape, dtype=self.dtype
         ).tocsr()
         matrix.sum_duplicates()
         matrix.eliminate_zeros()
         return matrix
+
+
+class HubbardHamiltonian(HoppingMatrixHamiltonian):
+    """Nearest-neighbor one-dimensional Hubbard Hamiltonian.
+
+    This backwards-compatible specialization constructs the chain hopping
+    matrix and delegates all action to :class:`HoppingMatrixHamiltonian`.
+    """
+
+    def __init__(
+        self,
+        basis: HubbardBasis,
+        t: Real = 1.0,
+        U: Real = 0.0,
+        boundary: Boundary = "open",
+    ) -> None:
+        self.t = _validate_real("t", t)
+        self.boundary = validate_boundary(boundary)
+        self._bonds = nearest_neighbor_bonds(basis.L, self.boundary)
+        super().__init__(
+            basis,
+            nearest_neighbor_hopping_matrix(
+                basis.L, t=self.t, boundary=self.boundary
+            ),
+            U=U,
+        )
+
+    @property
+    def bonds(self) -> tuple[tuple[int, int], ...]:
+        return self._bonds
 
 
 def build_hamiltonian(
@@ -179,7 +264,7 @@ def build_hamiltonian(
     boundary: Boundary = "open",
     max_dimension: int | None = DEFAULT_MAX_CSR_DIMENSION,
 ) -> csr_matrix:
-    """Convenience wrapper returning a CSR Hubbard Hamiltonian."""
+    """Convenience wrapper returning a CSR nearest-neighbor Hamiltonian."""
 
     return HubbardHamiltonian(basis, t=t, U=U, boundary=boundary).to_sparse(
         max_dimension=max_dimension
@@ -194,6 +279,6 @@ def hamiltonian_action(
     U: Real = 0.0,
     boundary: Boundary = "open",
 ) -> Matrix:
-    """Convenience wrapper for a one-off matrix-free action ``H @ vector``."""
+    """Convenience wrapper for a one-off nearest-neighbor action ``H @ vector``."""
 
     return HubbardHamiltonian(basis, t=t, U=U, boundary=boundary).matvec(vector)
