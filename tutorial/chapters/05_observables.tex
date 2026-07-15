@@ -1,0 +1,88 @@
+\chapter{Observables from the ground state}
+\label{chap:observables}
+
+Let
+\begin{equation}
+\ket{\psi}=\sum_s \psi_s\ket{s},\qquad
+\sum_s|\psi_s|^2=1.
+\end{equation}
+The observable routines normalize any finite nonzero input vector before
+measurement.  This is convenient, but solver output should already have unit
+norm; a large normalization correction would indicate an upstream problem.
+
+\section{Diagonal observables}
+
+Any occupation-only observable $O(s)$ is diagonal in the site basis:
+\begin{equation}
+\expect{O}=\sum_s |\psi_s|^2 O(s).
+\end{equation}
+This covers the total and local double occupancy,
+\begin{align}
+D &= \sum_i\expect{n_{i\uparrow}n_{i\downarrow}},\\
+D/L &= \text{double occupancy per site},
+\end{align}
+as well as local charge and magnetization,
+\begin{align}
+\expect{n_i} &= \expect{n_{i\uparrow}+n_{i\downarrow}},\\
+\expect{m_i} &= \expect{n_{i\uparrow}-n_{i\downarrow}}.
+\end{align}
+The project reports $m_i=2S_i^z$ for local magnetization and uses
+\begin{equation}
+S_i^z=\frac{n_{i\uparrow}-n_{i\downarrow}}{2}
+\end{equation}
+inside spin correlations.
+
+The longitudinal spin and connected charge correlations are
+\begin{align}
+C^{zz}_{ij} &= \expect{S_i^zS_j^z},\\
+C^n_{ij} &= \expect{n_in_j}-\expect{n_i}\expect{n_j}.
+\end{align}
+For fixed total particle number, summing $C^n_{ij}$ over both sites gives zero;
+this is a useful sum rule.
+
+\section{The one-body density matrix}
+
+The spin-resolved one-body density matrix is not diagonal in the site basis:
+\begin{equation}
+\gamma^{(\sigma)}_{ij}
+=\expect{c_{i\sigma}^\dagger c_{j\sigma}}.
+\label{eq:obdm}
+\end{equation}
+For every source basis state, apply $c_{i\sigma}^\dagger c_{j\sigma}$ using the
+same sign routine as the Hamiltonian, find the target basis state, and
+accumulate
+\begin{equation}
+(\psi_{s'})^*\,\mathrm{sign}(s'\leftarrow s)\,\psi_s.
+\end{equation}
+The basic checks are
+\begin{equation}
+\gamma^{(\sigma)}=\left(\gamma^{(\sigma)}\right)^\dagger,
+\qquad
+\operatorname{Tr}\gamma^{(\sigma)}=N_\sigma.
+\end{equation}
+The eigenvectors of $\gamma$ are natural orbitals, but using them as a basis
+for the interacting Hamiltonian requires the transformed interaction discussed
+in Chapter~\ref{chap:generalhopping}.
+
+\section{Fourier diagnostics}
+
+On momenta $k_m=2\pi m/L$, the convention for the momentum distribution is
+\begin{equation}
+n_\sigma(k)=\frac{1}{L}\sum_{ij}e^{ik(i-j)}
+\gamma^{(\sigma)}_{ij}.
+\end{equation}
+It obeys $\sum_k n_\sigma(k)=N_\sigma$.  The charge and longitudinal-spin
+structure factors use the same transform:
+\begin{align}
+N(q)&=\frac{1}{L}\sum_{ij}e^{iq(i-j)}C^n_{ij},\\
+S^{zz}(q)&=\frac{1}{L}\sum_{ij}e^{iq(i-j)}C^{zz}_{ij}.
+\end{align}
+The charge factor is connected by definition.  The spin factor is unconnected
+by default and has an explicit connected option.
+
+\lstinputlisting[caption={Measuring site, one-body, and Fourier observables.},label={lst:observables}]{code/step06_observables.py}
+
+\paragraph{Checkpoint.}
+Verify particle-number sums, Hermiticity and trace of the one-body density
+matrix, reflection symmetry on an open chain, vanishing connected charge
+$q=0$ weight, and nonnegative structure factors up to roundoff.

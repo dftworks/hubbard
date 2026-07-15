@@ -1,0 +1,76 @@
+\chapter{Fermionic operators and signs}
+\label{chap:operators}
+
+\section{One global ordering}
+
+Fermionic signs are meaningless until the spin orbitals have a global order.
+This project fixes
+\begin{equation}
+(0\uparrow,1\uparrow,\ldots,(L-1)\uparrow,
+ 0\downarrow,1\downarrow,\ldots,(L-1)\downarrow).
+\label{eq:ordering}
+\end{equation}
+Thus site $i$ has global orbital index $i$ for up spin and $L+i$ for down
+spin.  The two state integers can be viewed as one $2L$-bit integer,
+\begin{equation}
+B=b_\uparrow+(b_\downarrow\mathbin{\texttt{<<}}L).
+\end{equation}
+
+For orbital $p$, define the parity count
+\begin{equation}
+m_p(B)=\operatorname{popcount}\left(B\mathbin{\texttt{\&}}(2^p-1)\right).
+\end{equation}
+It counts occupied orbitals strictly before $p$.  The elementary actions are
+\begin{align}
+c_p\ket{B} &=( -1)^{m_p(B)}n_p\ket{B\text{ with }p\text{ cleared}},\\
+c_p^\dagger\ket{B} &=( -1)^{m_p(B)}(1-n_p)
+\ket{B\text{ with }p\text{ set}}.
+\end{align}
+An invalid annihilation or creation returns no state rather than a zero-amplitude
+state.
+
+\section{A hop is two operator actions}
+
+The hopping operator $c_p^\dagger c_q$ acts from right to left:
+\begin{enumerate}
+\item annihilate at $q$ using the original occupation;
+\item create at $p$ using the intermediate occupation;
+\item multiply the two signs.
+\end{enumerate}
+Computing a sign from a shortcut tied only to geometric distance is fragile.
+The two-action algorithm remains correct for different spins, long-range
+hopping, and periodic boundary bonds.
+
+Consider $L=4$, $b_\uparrow=1010_2$, and the periodic hop $3\to0$.  Site $1$
+is occupied between orbitals $0$ and $3$, so
+\begin{equation}
+c_{0\uparrow}^\dagger c_{3\uparrow}ket{1010_2}=-\ket{0011_2}.
+\end{equation}
+The sign is not $+1$.  This is the boundary case most likely to expose an
+incorrect nearest-neighbor shortcut.
+
+\lstinputlisting[caption={Inspecting creation and periodic hopping signs.},label={lst:signs}]{code/step02_fermion_signs.py}
+
+\section{Algebraic tests}
+
+The implementation is checked against the canonical anticommutators
+\begin{align}
+\{c_p,c_q^\dagger\}&=\delta_{pq},\\
+\{c_p,c_q\}&=0,\\
+\{c_p^\dagger,c_q^\dagger\}&=0.
+\end{align}
+For small $L$, these identities can be tested exhaustively on the complete
+$2^{2L}$-state Fock space.  Exhaustive tests are inexpensive here and stronger
+than testing only a few hand-selected signs.
+
+The down-spin sign includes all occupied up orbitals because the down block
+comes second in Eq.~\eqref{eq:ordering}.  In a number-conserving down-spin hop,
+the up-block contribution appears twice and cancels, but creation and
+annihilation must still each obey the global convention.  This distinction
+becomes important as soon as non-number-conserving operators or Green
+functions are introduced.
+
+\paragraph{Checkpoint.}
+Do not construct a Hamiltonian until the full small-space anticommutators,
+cross-spin signs, an adjacent hop, and an occupied periodic-boundary hop all
+pass.
