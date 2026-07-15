@@ -118,3 +118,41 @@ def apply_spin_hop(
         spin_orbital(L, destination_site, spin),
         spin_orbital(L, source_site, spin),
     )
+
+
+def apply_up_down_term(
+    state: BasisState,
+    L: int,
+    creation_up: int,
+    annihilation_up: int,
+    creation_down: int,
+    annihilation_down: int,
+) -> OperatorResult | None:
+    """Apply ``c^dagger_a,up c_b,up c^dagger_c,down c_d,down``.
+
+    Operators act from right to left: the down-spin bilinear is applied first,
+    followed by the up-spin bilinear.  Both use the global spin-orbital ordering
+    and their signs are multiplied.
+    """
+
+    down_result = apply_spin_hop(
+        state,
+        L,
+        creation_down,
+        annihilation_down,
+        "down",
+    )
+    if down_result is None:
+        return None
+    intermediate, sign_down = down_result
+    up_result = apply_spin_hop(
+        intermediate,
+        L,
+        creation_up,
+        annihilation_up,
+        "up",
+    )
+    if up_result is None:
+        return None
+    final_state, sign_up = up_result
+    return final_state, sign_down * sign_up

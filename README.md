@@ -149,6 +149,41 @@ onsite `U` therefore describes a different interacting model, except at
 two-body operator is required for exact wavelet, natural-orbital, or learned
 orbital representations of the full interacting Hamiltonian.
 
+## General up-down interaction tensors
+
+`TwoBodyTensorHamiltonian` extends the one-body interface to
+
+\[
+H=\sum_{ij,\sigma}h_{ij}c^\dagger_{i\sigma}c_{j\sigma}
+ +\sum_{abcd}V_{abcd}
+ c^\dagger_{a\uparrow}c_{b\uparrow}
+ c^\dagger_{c\downarrow}c_{d\downarrow}.
+\]
+
+The array convention is `V[a,b,c,d]` for the operator order shown above, with
+Hermiticity condition `V[a,b,c,d] = conj(V[b,a,d,c])`.  The constructor copies,
+validates, Hermitian-symmetrizes, and stores both the one- and two-body arrays
+read-only.  A local Hubbard interaction is recovered exactly with:
+
+```python
+from hubbard_ed import (
+    HubbardBasis,
+    TwoBodyTensorHamiltonian,
+    nearest_neighbor_hopping_matrix,
+    onsite_interaction_tensor,
+)
+
+basis = HubbardBasis(4, 2, 2)
+h = nearest_neighbor_hopping_matrix(4, boundary="open")
+V = onsite_interaction_tensor(4, U=4.0)
+hamiltonian = TwoBodyTensorHamiltonian(basis, h, V)
+```
+
+Tensor actions use exact nonzero entries and have a conservative default work
+guard of 5,000,000 attempted terms per matrix-vector product.  This is a
+correctness-first reference for small systems, not a dense-tensor production
+engine.
+
 ## Observables and normalization
 
 The observable module implements:
