@@ -48,7 +48,8 @@ the only numerical dependencies.
 \input{chapters/05_observables}
 \input{chapters/06_validation}
 \input{chapters/07_general_hopping}
-\input{chapters/08_research_extensions}
+\input{chapters/08_exact_orbital_rotations}
+\input{chapters/09_research_extensions}
 
 \appendix
 \chapter{Package map}
@@ -61,6 +62,8 @@ Module & Responsibility \\
 \code{basis.py} & Fixed-sector enumeration and index maps \\
 \code{operators.py} & Creation, annihilation, and hopping signs \\
 \code{hamiltonian.py} & CSR, matrix-free, and generic one-body matrices \\
+\code{interactions.py} & General up--down interaction tensors \\
+\code{orbitals.py} & Exact one- and two-body basis transformations \\
 \code{lanczos.py} & Lowest eigenpairs and residual diagnostics \\
 \code{observables.py} & Local, correlation, and Fourier observables \\
 \code{analytic.py} & Two-site and noninteracting reference results \\

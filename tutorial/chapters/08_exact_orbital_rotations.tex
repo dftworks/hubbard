@@ -1,0 +1,89 @@
+\chapter{Exact orbital rotations at finite interaction}
+\label{chap:orbitalrotations}
+
+Chapter~\ref{chap:generalhopping} showed that rotating only the one-body
+matrix is incomplete at finite $U$.  We now implement the missing two-body
+term and turn basis invariance into an executable test.
+
+\section{One convention for every index}
+
+Let $R$ be unitary and define the new orbital operators by
+\begin{equation}
+c_{i\sigma}=\sum_a R_{ia}d_{a\sigma}.
+\label{eq:rotationconvention}
+\end{equation}
+The columns of $R$ are therefore the new orbitals expressed in the old basis.
+The one-body matrix becomes
+\begin{equation}
+h'_{ab}=\sum_{ij}R^*_{ia}h_{ij}R_{jb}
+       =\left(R^\dagger hR\right)_{ab}.
+\end{equation}
+
+For a general up--down interaction, use the explicit operator convention
+\begin{equation}
+H_V=\sum_{ijkl}V_{ijkl}
+c_{i\uparrow}^\dagger c_{j\uparrow}
+c_{k\downarrow}^\dagger c_{l\downarrow}.
+\end{equation}
+Substitution of Eq.~\eqref{eq:rotationconvention} gives
+\begin{equation}
+V'_{abcd}=\sum_{ijkl}
+R^*_{ia}R_{jb}R^*_{kc}R_{ld}V_{ijkl}.
+\label{eq:generaltensorrotation}
+\end{equation}
+For the site-local Hubbard tensor $V_{iiii}=U$, this reduces to
+Eq.~\eqref{eq:rotatedinteraction}.  Hermiticity is expressed directly in the
+stored index order:
+\begin{equation}
+V_{abcd}=V^*_{badc}.
+\end{equation}
+
+The public transformation functions have separate, explicit roles:
+\begin{itemize}
+\item \code{rotate\_one\_body} transforms $h$;
+\item \code{rotate\_interaction\_tensor} transforms $V$;
+\item \code{rotate\_integrals} transforms a consistent $(h,V)$ pair;
+\item \code{rotate\_hubbard\_integrals} starts from local $U$.
+\end{itemize}
+Inputs are copied, checked for finite values, checked for Hermiticity or
+unitarity to tolerance $10^{-12}$, and returned read-only.
+
+\section{Fermionic action and the strongest small-system test}
+
+The tensor Hamiltonian applies
+$c_{a\uparrow}^\dagger c_{b\uparrow}
+ c_{c\downarrow}^\dagger c_{d\downarrow}$ from right to left using the same
+global spin-orbital convention as every earlier operator.  It supports both
+CSR construction and matrix-free products.  The local tensor has only $L$
+nonzero entries, while a generic rotation makes all $L^4$ entries nonzero.
+
+A unitary basis change cannot alter the exact many-body eigenvalues.  For a
+small sector we can therefore compare the \emph{complete} sorted spectra,
+including degeneracies, rather than checking only the ground energy.  This
+single test probes the rotation conjugations, all four tensor indices,
+fermionic signs, and matrix assembly.
+
+\lstinputlisting[caption={Exact finite-$U$ orbital rotation and full-spectrum check.},label={lst:orbitalrotation}]{code/step08_orbital_rotation.py}
+
+The listing also exposes the cost change: a local $U$ tensor becomes dense.
+The reference implementation intentionally retains every nonzero coefficient
+and estimates attempted action terms before accepting the calculation.  Near
+half filling, a dense rotated tensor is quick at $L=4$, useful but slower at
+$L=6$, and rejected by the default work guard at $L=8$.  Structured or
+truncated tensors will require separate error controls in future work.
+
+\section{What an observable means after rotation}
+
+The spectrum is basis invariant, but an array index in the rotated basis labels
+an orbital, not a physical site.  Applying the existing local-charge routine
+directly to a rotated state measures orbital occupation.  To recover physical
+site density or spin correlations, transform the observable tensor as well, or
+transform the many-body state back.  This distinction is essential when
+comparing wavelets, natural orbitals, or learned rotations.
+
+\paragraph{Checkpoint.}
+Use a deterministic complex unitary.  Verify $R^\dagger R=I$, Hermiticity of
+the transformed arrays, complete-spectrum agreement below $10^{-10}$, CSR
+versus matrix-free agreement, and small eigenpair residuals.  As a negative
+control, rotate $h$ but retain local $U$ and confirm that the finite-$U$
+spectrum changes.
