@@ -77,9 +77,11 @@ def double_occupancy_count(state: BasisState) -> int:
     return (state[0] & state[1]).bit_count()
 
 
-def _validated_hopping_matrix(
+def validate_hopping_matrix(
     hopping_matrix: ArrayLike, L: int
 ) -> NDArray[np.float64] | NDArray[np.complex128]:
+    """Validate, Hermitian-symmetrize, and copy a one-body matrix."""
+
     candidate = np.asarray(hopping_matrix)
     if candidate.shape != (L, L):
         raise ValueError(f"hopping_matrix must have shape ({L}, {L})")
@@ -133,7 +135,7 @@ class HoppingMatrixHamiltonian:
             raise TypeError("basis must be a HubbardBasis")
         self.basis = basis
         self.U = _validate_real("U", U)
-        self.hopping_matrix = _validated_hopping_matrix(hopping_matrix, basis.L)
+        self.hopping_matrix = validate_hopping_matrix(hopping_matrix, basis.L)
         self.dtype = np.dtype(np.result_type(self.hopping_matrix.dtype, np.float64))
         self._hopping_terms: tuple[tuple[int, int, Scalar], ...] = tuple(
             (int(destination), int(source), self.hopping_matrix[destination, source].item())

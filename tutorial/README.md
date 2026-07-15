@@ -11,7 +11,8 @@ of complexity:
 5. observables;
 6. analytic and limiting-case validation;
 7. arbitrary real or complex hopping matrices;
-8. research extensions and their consistency requirements.
+8. exact finite-interaction orbital rotations and spectral invariance;
+9. research extensions and their consistency requirements.
 
 ## Run the code
 

@@ -15,10 +15,11 @@ The following order preserves independent validation at each stage.
 \item \textbf{Natural-orbital diagnostics.}  Diagonalize the one-body density
       matrix from Eq.~\eqref{eq:obdm}.  At first, treat its eigenvectors as an
       analysis tool rather than silently changing the interacting Hamiltonian.
-\item \textbf{General two-body tensors.}  Implement Eq.~\eqref{eq:rotatedinteraction}
-      with an explicit index and operator-ordering convention.  Check unitary
-      basis invariance of the complete small-system spectrum.
-\item \textbf{Wavelet and learned rotations.}  Transform both one- and two-body
+\item \textbf{General two-body tensors.}  Now supported by
+      Chapter~\ref{chap:orbitalrotations}, with an explicit index and
+      operator-ordering convention plus complete-spectrum invariance tests.
+\item \textbf{Wavelet and learned rotations.}  Use the exact transformation as
+      a reference, then transform both one- and two-body
       terms.  Compare energies, residuals, reduced density matrices, and
       truncation errors against the site-basis result.
 \item \textbf{Entanglement diagnostics.}  Add subsystem maps and reduced density
@@ -69,10 +70,10 @@ against the current implementation.
       chain.  Check their sum and spin symmetry.
 \item Construct a random unitary $R$ at $U=0$ and verify that $h$ and
       $R^\dagger hR$ give identical many-body spectra.
-\item Implement the four-index interaction for $L=2$ and verify full spectral
-      invariance under a random orbital rotation.
+\item Repeat the full-spectrum rotation test with a structured transform such
+      as a discrete Fourier or wavelet matrix.  Compare tensor sparsity.
 \end{enumerate}
 
-The last exercise is the natural bridge from this tutorial to serious orbital
-representation research: it tests not only code, but whether the transformed
-Hamiltonian still represents the same physics.
+The last exercise is a natural bridge from this tutorial to serious orbital
+representation research: it tests not only code, but how representation
+structure changes computational cost while preserving the physics.
