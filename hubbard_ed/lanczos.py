@@ -57,10 +57,11 @@ def solve_hamiltonian(
     """Solve a constructed fixed-sector Hamiltonian for its lowest states.
 
     The default route passes the on-the-fly ``LinearOperator`` to
-    :func:`scipy.sparse.linalg.eigsh`.  Real and complex Hermitian hopping
-    matrices are both supported.  Tiny sectors and complete-spectrum requests
-    use a dense fallback because ARPACK requires ``k < dimension``.  Residuals
-    are always recomputed with the matrix-free action.
+    :func:`scipy.sparse.linalg.eigsh`.  Real and complex Hermitian one- and
+    two-body terms are supported by the concrete Hamiltonian classes.  Tiny
+    sectors and complete-spectrum requests use a dense fallback because ARPACK
+    requires ``k < dimension``.  Residuals are always recomputed with the
+    matrix-free action.
     """
 
     if not isinstance(hamiltonian, HoppingMatrixHamiltonian):

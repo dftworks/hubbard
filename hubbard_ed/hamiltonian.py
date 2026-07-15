@@ -12,7 +12,8 @@ from scipy.sparse import coo_matrix, csr_matrix
 from scipy.sparse.linalg import LinearOperator
 
 from .basis import BasisState, HubbardBasis, validate_sector
-from .operators import Spin, apply_spin_hop
+from .interactions import validate_interaction_tensor
+from .operators import Spin, apply_spin_hop, apply_up_down_term
 
 Boundary = Literal["open", "periodic"]
 Matrix: TypeAlias = NDArray[np.float64] | NDArray[np.complex128]
@@ -21,6 +22,7 @@ Scalar: TypeAlias = float | complex
 # A conservative default for explicit CSR construction.  Matrix-free solving
 # has a separate limit inherited from HubbardBasis.
 DEFAULT_MAX_CSR_DIMENSION = 250_000
+DEFAULT_MAX_TENSOR_ACTIONS = 5_000_000
 HERMITICITY_TOLERANCE = 1e-12
 
 
@@ -159,6 +161,14 @@ class HoppingMatrixHamiltonian:
                     target, sign = result
                     yield target, matrix_element * sign
 
+    def _column_targets(
+        self, state: BasisState
+    ) -> Iterator[tuple[BasisState, Scalar]]:
+        diagonal = self.U * double_occupancy_count(state)
+        if diagonal != 0.0:
+            yield state, diagonal
+        yield from self._hopping_targets(state)
+
     def matvec(self, vector: ArrayLike) -> Matrix:
         """Compute ``H @ vector`` without materializing ``H``."""
 
@@ -176,8 +186,7 @@ class HoppingMatrixHamiltonian:
             amplitude = x[column]
             if amplitude == 0:
                 continue
-            y[column] += self.U * double_occupancy_count(state) * amplitude
-            for target, matrix_element in self._hopping_targets(state):
+            for target, matrix_element in self._column_targets(state):
                 y[self.basis.state_index(target)] += matrix_element * amplitude
         return y
 
@@ -208,12 +217,7 @@ class HoppingMatrixHamiltonian:
         columns: list[int] = []
         values: list[Scalar] = []
         for column, state in enumerate(self.basis):
-            diagonal = self.U * double_occupancy_count(state)
-            if diagonal != 0.0:
-                rows.append(column)
-                columns.append(column)
-                values.append(diagonal)
-            for target, matrix_element in self._hopping_targets(state):
+            for target, matrix_element in self._column_targets(state):
                 rows.append(self.basis.state_index(target))
                 columns.append(column)
                 values.append(matrix_element)
@@ -224,6 +228,102 @@ class HoppingMatrixHamiltonian:
         matrix.sum_duplicates()
         matrix.eliminate_zeros()
         return matrix
+
+
+class TwoBodyTensorHamiltonian(HoppingMatrixHamiltonian):
+    """Hamiltonian with an arbitrary spin-conserving up-down interaction.
+
+    The interaction convention is
+
+    ``sum_abcd V[a,b,c,d] c_a,up^dagger c_b,up``
+    ``c_c,down^dagger c_d,down``.
+
+    The tensor must be finite and Hermitian under
+    ``V[a,b,c,d] = conj(V[b,a,d,c])``.  Only its exact nonzero entries are
+    stored as action terms.  The default work guard estimates the number of
+    attempted one- and two-body terms in one matrix-vector product.
+    """
+
+    def __init__(
+        self,
+        basis: HubbardBasis,
+        hopping_matrix: ArrayLike,
+        interaction_tensor: ArrayLike,
+        *,
+        max_action_terms: int | None = DEFAULT_MAX_TENSOR_ACTIONS,
+    ) -> None:
+        super().__init__(basis, hopping_matrix, U=0.0)
+        self.interaction_tensor = validate_interaction_tensor(
+            interaction_tensor, basis.L
+        )
+        self.dtype = np.dtype(
+            np.result_type(
+                self.hopping_matrix.dtype,
+                self.interaction_tensor.dtype,
+                np.float64,
+            )
+        )
+        self._interaction_terms: tuple[
+            tuple[int, int, int, int, Scalar], ...
+        ] = tuple(
+            (
+                int(creation_up),
+                int(annihilation_up),
+                int(creation_down),
+                int(annihilation_down),
+                self.interaction_tensor[
+                    creation_up,
+                    annihilation_up,
+                    creation_down,
+                    annihilation_down,
+                ].item(),
+            )
+            for creation_up, annihilation_up, creation_down, annihilation_down in zip(
+                *np.nonzero(self.interaction_tensor)
+            )
+        )
+        self.interaction_term_count = len(self._interaction_terms)
+        self.estimated_action_terms = self.basis.dimension * (
+            2 * len(self._hopping_terms) + self.interaction_term_count
+        )
+
+        if max_action_terms is not None:
+            if isinstance(max_action_terms, bool) or not isinstance(
+                max_action_terms, int
+            ):
+                raise TypeError("max_action_terms must be an integer or None")
+            if max_action_terms < 1:
+                raise ValueError("max_action_terms must be positive or None")
+            if self.estimated_action_terms > max_action_terms:
+                raise ValueError(
+                    f"estimated tensor action work {self.estimated_action_terms:,} "
+                    f"exceeds the configured limit {max_action_terms:,}; use a "
+                    "sparser tensor, a smaller sector, or raise the limit "
+                    "explicitly after benchmarking"
+                )
+
+    def _column_targets(
+        self, state: BasisState
+    ) -> Iterator[tuple[BasisState, Scalar]]:
+        yield from super()._column_targets(state)
+        for (
+            creation_up,
+            annihilation_up,
+            creation_down,
+            annihilation_down,
+            matrix_element,
+        ) in self._interaction_terms:
+            result = apply_up_down_term(
+                state,
+                self.basis.L,
+                creation_up,
+                annihilation_up,
+                creation_down,
+                annihilation_down,
+            )
+            if result is not None:
+                target, sign = result
+                yield target, matrix_element * sign
 
 
 class HubbardHamiltonian(HoppingMatrixHamiltonian):
