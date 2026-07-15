@@ -1,0 +1,97 @@
+\chapter{Exact results and limiting-case validation}
+\label{chap:validation}
+
+A reference solver earns trust by failing loudly when any layer disagrees with
+an independent result.  The validation suite is deliberately redundant:
+operator algebra, matrix properties, analytic spectra, limiting cases, and
+iterative residuals constrain different classes of mistakes.
+
+\section{The validation ladder}
+
+\begin{center}
+\begin{tabular}{p{0.24\textwidth}p{0.66\textwidth}}
+\toprule
+Check & What it detects \\
+\midrule
+Basis dimension & Missing, duplicated, or out-of-sector states \\
+Anticommutators & Global-ordering and parity errors \\
+Hermiticity & Missing reverse hops and inconsistent signs \\
+Two-site formula & Interaction normalization and hopping scale \\
+Full $U=0$ spectrum & Bond convention, degeneracies, and spin factorization \\
+Atomic limit & Double-occupancy diagonal \\
+Large-$U$ gap & Low-energy scale and excited-state ordering \\
+CSR versus matrix-free & Divergent implementations \\
+Residual norms & Eigensolver convergence and returned-vector integrity \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Half-filled two-site model}
+
+For $L=2$, $N_\uparrow=N_\downarrow=1$, and one unique bond, the ground-state
+energy is
+\begin{equation}
+E_0=\frac{U}{2}-\frac{1}{2}\sqrt{U^2+16t^2}.
+\label{eq:twosite}
+\end{equation}
+This single formula tests the relative factors in both Hamiltonian terms.  It
+should be checked at several positive and negative $U$ values and more than one
+$t$.
+
+At large repulsive $U$, the triplet lies at zero energy while the singlet is
+lowered, giving
+\begin{equation}
+\Delta_{ST}=-E_0
+=\frac{\sqrt{U^2+16t^2}-U}{2}
+=\frac{4t^2}{U}+O(U^{-3}).
+\end{equation}
+Thus the solver recovers the superexchange scale $J=4t^2/U$.
+
+\section{Noninteracting limit}
+
+At $U=0$, diagonalize the one-particle hopping problem independently.  For an
+open chain,
+\begin{equation}
+\epsilon_m=-2t\cos\left(\frac{m\pi}{L+1}\right),
+\qquad m=1,\ldots,L.
+\end{equation}
+For a periodic chain with $L\ge3$,
+\begin{equation}
+\epsilon_m=-2t\cos\left(\frac{2\pi m}{L}\right),
+\qquad m=0,\ldots,L-1.
+\end{equation}
+Under the unique-edge convention, $L=2$ instead has energies $(-|t|,|t|)$.
+
+Every many-body energy in the fixed sector is a sum of occupied one-particle
+energies,
+\begin{equation}
+E=\sum_{a\in A_\uparrow}\epsilon_a
+ +\sum_{b\in A_\downarrow}\epsilon_b.
+\end{equation}
+Comparing the complete small-system spectrum---including repeated values---is
+stronger than checking only the ground energy.  Degeneracies are part of the
+expected answer, not noise to be discarded.
+
+\section{Atomic limit and implementation agreement}
+
+At $t=0$, every basis state is already an eigenstate and
+\begin{equation}
+E(s)=U\,\operatorname{popcount}(b_\uparrow\mathbin{\texttt{\&}}b_\downarrow).
+\end{equation}
+There must be no off-diagonal matrix elements.  Finally, for seeded random
+vectors, require
+\begin{equation}
+\norm{H_{\mathrm{CSR}}x-H_{\mathrm{free}}x}_2
+\end{equation}
+to be consistent with floating-point roundoff, and require Eq.~\eqref{eq:residual}
+for every computed eigenpair.
+
+Run the complete executable validation with
+\begin{verbatim}
+.venv/bin/python -m pytest -q
+\end{verbatim}
+The tutorial programs supplement rather than replace these automated tests.
+
+\paragraph{Checkpoint.}
+A new representation should reproduce this entire ladder on the largest
+shared system size before its performance or scaling claims are considered.

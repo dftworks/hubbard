@@ -1,0 +1,78 @@
+\chapter{From reference solver to research experiments}
+\label{chap:extensions}
+
+The current solver is intentionally small.  Its purpose is not to compete with
+high-performance many-body packages, but to provide a transparent numerical
+contract for new representations.
+
+\section{A safe extension sequence}
+
+The following order preserves independent validation at each stage.
+\begin{enumerate}
+\item \textbf{Arbitrary one-body graphs.}  Already supported through
+      Chapter~\ref{chap:generalhopping}; use this for longer-range hopping, disorder,
+      and flux.
+\item \textbf{Natural-orbital diagnostics.}  Diagonalize the one-body density
+      matrix from Eq.~\eqref{eq:obdm}.  At first, treat its eigenvectors as an
+      analysis tool rather than silently changing the interacting Hamiltonian.
+\item \textbf{General two-body tensors.}  Implement Eq.~\eqref{eq:rotatedinteraction}
+      with an explicit index and operator-ordering convention.  Check unitary
+      basis invariance of the complete small-system spectrum.
+\item \textbf{Wavelet and learned rotations.}  Transform both one- and two-body
+      terms.  Compare energies, residuals, reduced density matrices, and
+      truncation errors against the site-basis result.
+\item \textbf{Entanglement diagnostics.}  Add subsystem maps and reduced density
+      matrices only after fixing the tensor-product ordering used for a cut.
+\item \textbf{External methods.}  Compare DMRG, neural-network, and transformer
+      wavefunctions on identical finite chains and boundary conventions.
+\end{enumerate}
+
+\section{A reproducible experiment contract}
+
+Every comparison should record
+\begin{itemize}
+\item $L$, $(N_\uparrow,N_\downarrow)$, $t$, $U$, and boundary condition;
+\item the spin-orbital and basis enumeration conventions;
+\item Hilbert-space dimension and whether the action is CSR or matrix-free;
+\item solver tolerance, random seed, eigenvalue count, and measured residuals;
+\item all orbital transforms and whether the interaction was transformed;
+\item observables with their normalization conventions;
+\item agreement with at least one analytic limit and the site-basis reference.
+\end{itemize}
+Energy alone is not a sufficient comparison.  Two states with similar energy
+can have different correlations, symmetry content, or reduced density
+matrices.
+
+\section{Performance interpretation}
+
+The half-filled dimensions in Chapter~\ref{chap:basis} explain the practical
+range.  On the reference host, $L=8$ is quick and $L=10$ is an upper practical
+target; $L=12$ is generally too slow and memory-heavy in pure Python.  A dense
+general hopping matrix also has up to $L^2$ terms per spin, so a matrix-free
+product can be much slower than the nearest-neighbor action at the same
+$\basisdim$.
+
+Optimization should follow profiling and retain a slow trusted path.  Useful
+future optimizations include cached transition tables, compiled bit kernels,
+symmetry-sector reductions, and parallel observable evaluation.  Each optimized
+path should continue to pass the random-vector and full-spectrum comparisons
+against the current implementation.
+
+\section{Suggested exercises}
+
+\begin{enumerate}
+\item Add a site-dependent diagonal potential through $h_{ii}$ and verify the
+      $U=0$ full spectrum from the one-particle eigenvalues.
+\item Add a next-nearest-neighbor edge whose source and destination have an
+      occupied site between them; predict and test the sign.
+\item Compute natural-orbital occupations for $U/t=0,4,16$ on the open $L=6$
+      chain.  Check their sum and spin symmetry.
+\item Construct a random unitary $R$ at $U=0$ and verify that $h$ and
+      $R^\dagger hR$ give identical many-body spectra.
+\item Implement the four-index interaction for $L=2$ and verify full spectral
+      invariance under a random orbital rotation.
+\end{enumerate}
+
+The last exercise is the natural bridge from this tutorial to serious orbital
+representation research: it tests not only code, but whether the transformed
+Hamiltonian still represents the same physics.

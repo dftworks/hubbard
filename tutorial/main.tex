@@ -1,0 +1,75 @@
+\input{preamble}
+
+\title{Building a Trustworthy Hubbard\\Exact-Diagonalization Solver\\
+\large A step-by-step implementation tutorial}
+\author{The \code{hubbard-ed} project}
+\date{\today}
+
+\begin{document}
+
+\frontmatter
+\hypersetup{pageanchor=false}
+\maketitle
+\cleardoublepage
+\hypersetup{pageanchor=true}
+\setcounter{page}{1}
+
+\chapter*{How to use this tutorial}
+\addcontentsline{toc}{chapter}{How to use this tutorial}
+
+This tutorial develops a small exact-diagonalization solver for the
+one-dimensional spin-$1/2$ Hubbard model.  The order is deliberate: each
+chapter adds one abstraction only after the previous layer has a numerical
+check.  The result is useful both as an educational implementation and as a
+reference against which more ambitious representations can be tested.
+
+Every complete program printed in this document lives in the adjacent
+\code{code/} directory and is included with \code{\textbackslash
+lstinputlisting}.  The manuscript therefore displays the same source that is
+executed during validation.  From the repository root, run
+
+\begin{verbatim}
+for script in tutorial/code/step*.py; do
+    .venv/bin/python "$script"
+done
+\end{verbatim}
+
+The tutorial assumes familiarity with elementary second quantization and
+linear algebra, but not with a many-body software library.  NumPy and SciPy are
+the only numerical dependencies.
+
+\tableofcontents
+
+\mainmatter
+\input{chapters/01_model_and_basis}
+\input{chapters/02_fermionic_operators}
+\input{chapters/03_sparse_hamiltonian}
+\input{chapters/04_matrix_free_lanczos}
+\input{chapters/05_observables}
+\input{chapters/06_validation}
+\input{chapters/07_general_hopping}
+\input{chapters/08_research_extensions}
+
+\appendix
+\chapter{Package map}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+Module & Responsibility \\
+\midrule
+\code{basis.py} & Fixed-sector enumeration and index maps \\
+\code{operators.py} & Creation, annihilation, and hopping signs \\
+\code{hamiltonian.py} & CSR, matrix-free, and generic one-body matrices \\
+\code{lanczos.py} & Lowest eigenpairs and residual diagnostics \\
+\code{observables.py} & Local, correlation, and Fourier observables \\
+\code{analytic.py} & Two-site and noninteracting reference results \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The production source is intentionally compact.  Read each module after its
+corresponding chapter, then inspect the matching tests to see how the stated
+invariants are enforced.
+
+\end{document}

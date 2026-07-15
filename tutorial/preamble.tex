@@ -1,0 +1,51 @@
+\documentclass[11pt,oneside]{book}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{booktabs}
+\usepackage[margin=1in]{geometry}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{codeblue}{RGB}{25,75,135}
+\definecolor{codegreen}{RGB}{25,115,65}
+\definecolor{codegray}{RGB}{95,95,95}
+\definecolor{codebackground}{RGB}{247,247,247}
+
+\lstdefinestyle{python}{
+  language=Python,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{codeblue}\bfseries,
+  commentstyle=\color{codegreen},
+  stringstyle=\color{codegray},
+  backgroundcolor=\color{codebackground},
+  frame=single,
+  rulecolor=\color{black!20},
+  numbers=left,
+  numberstyle=\tiny\color{codegray},
+  numbersep=8pt,
+  showstringspaces=false,
+  breaklines=true,
+  breakatwhitespace=false,
+  columns=fullflexible,
+  keepspaces=true,
+  tabsize=4
+}
+\lstset{style=python}
+
+\newcommand{\Hubbard}{\mathcal{H}}
+\newcommand{\basisdim}{\mathcal{D}}
+\newcommand{\ket}[1]{\left\lvert #1 \right\rangle}
+\newcommand{\bra}[1]{\left\langle #1 \right\rvert}
+\newcommand{\braket}[2]{\left\langle #1 \middle\vert #2 \right\rangle}
+\newcommand{\expect}[1]{\left\langle #1 \right\rangle}
+\newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
+\newcommand{\code}[1]{\texttt{#1}}
+
+\hypersetup{
+  pdftitle={Building a Trustworthy Hubbard Exact-Diagonalization Solver},
+  pdfauthor={hubbard-ed contributors},
+  pdfsubject={Exact diagonalization tutorial for the one-dimensional Hubbard model}
+}

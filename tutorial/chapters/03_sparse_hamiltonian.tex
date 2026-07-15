@@ -1,0 +1,61 @@
+\chapter{Assembling the sparse Hamiltonian}
+\label{chap:sparse}
+
+\section{Separate diagonal and hopping actions}
+
+For a basis state $s=(b_\uparrow,b_\downarrow)$, the interaction is diagonal:
+\begin{equation}
+\bra{s}H_U\ket{s}=U\,
+\operatorname{popcount}(b_\uparrow\mathbin{\texttt{\&}}b_\downarrow).
+\label{eq:interactiondiag}
+\end{equation}
+Every allowed hopping term produces a target state in the same
+$(N_\uparrow,N_\downarrow)$ sector.  Its matrix element is $-t$ times the sign
+returned by the operator layer.
+
+Open chains contain the unique undirected bonds
+\begin{equation}
+(0,1),(1,2),\ldots,(L-2,L-1).
+\end{equation}
+Periodic chains add $(L-1,0)$ when $L>2$.  The $L=2$ periodic chain deliberately
+contains the same single edge as the open chain; adding it twice would double
+the hopping and invalidate the standard two-site analytic result.  For every
+undirected edge, both hopping directions and both spin species are applied.
+
+\section{Column-wise construction}
+
+Sparse assembly follows the definition of a matrix action.  For every basis
+column $j$ representing $\ket{s_j}$:
+\begin{enumerate}
+\item append the interaction value from Eq.~\eqref{eq:interactiondiag} at
+      $(j,j)$ if it is nonzero;
+\item apply each directed spin-preserving hop;
+\item map the resulting state $s_i$ to a row index $i$;
+\item append the signed matrix element at $(i,j)$.
+\end{enumerate}
+The triplets $(i,j,H_{ij})$ are first accumulated as a coordinate matrix and
+then converted to compressed sparse row (CSR) form.  Duplicate entries are
+summed and explicit zeros are removed.
+
+\lstinputlisting[caption={Building and checking a CSR Hamiltonian.},label={lst:sparse}]{code/step03_sparse_hamiltonian.py}
+
+\section{Hermiticity as an implementation invariant}
+
+For real $t$ and $U$, the result must be real symmetric.  More generally,
+\begin{equation}
+H=H^\dagger.
+\end{equation}
+This test catches missing reverse hops, inconsistent signs, incorrectly
+duplicated bonds, and many indexing errors.  Check both open and periodic
+boundaries and more than one particle sector.
+
+Sparse storage changes the scaling from $O(\basisdim^2)$ dense entries to
+roughly $O(zL\basisdim)$ possible transitions, where $z$ is a small
+coordination-dependent factor.  However, Python lists used during coordinate
+assembly have nontrivial overhead.  The implementation therefore has a
+separate conservative dimension guard for explicit CSR construction.
+
+\paragraph{Checkpoint.}
+For tiny systems, compare the CSR matrix with its conjugate transpose exactly
+up to numerical roundoff, inspect the atomic-limit diagonal, and verify at
+least one periodic-boundary matrix element whose fermionic sign is negative.

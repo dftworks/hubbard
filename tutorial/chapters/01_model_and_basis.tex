@@ -1,0 +1,92 @@
+\chapter{Model, sectors, and bit-string bases}
+\label{chap:basis}
+
+\section{The reference problem}
+
+For a chain of $L$ sites, the spin-$1/2$ Hubbard Hamiltonian is
+\begin{equation}
+H = -t\sum_{\langle i,j\rangle,\sigma}
+\left(c^{\dagger}_{i\sigma}c_{j\sigma}
+    +c^{\dagger}_{j\sigma}c_{i\sigma}\right)
++U\sum_{i=0}^{L-1}n_{i\uparrow}n_{i\downarrow}.
+\label{eq:hubbard}
+\end{equation}
+The solver supports open and periodic nearest-neighbor chains.  Both the
+up-spin number $N_\uparrow$ and down-spin number $N_\downarrow$ commute with
+$H$, so the full Fock space splits into independent blocks.  We solve one block
+at a time.
+
+Working in a fixed sector is the first important reduction.  Instead of a
+$4^L$-dimensional site Fock space, the sector dimension is
+\begin{equation}
+\basisdim(L,N_\uparrow,N_\downarrow)
+= \binom{L}{N_\uparrow}\binom{L}{N_\downarrow}.
+\label{eq:dimension}
+\end{equation}
+The reduction is exact because the Hamiltonian never changes either particle
+number.
+
+\section{Two integers per basis state}
+
+A basis state is represented by
+\begin{equation}
+s=(b_\uparrow,b_\downarrow),
+\end{equation}
+where bit $i$ of $b_\sigma$ is one exactly when site $i$ contains a spin
+$\sigma$ electron.  Site zero is the least significant bit.  For example, at
+$L=4$,
+\begin{equation}
+(b_\uparrow,b_\downarrow)=(0101_2,0010_2)
+\end{equation}
+has up electrons on sites $0$ and $2$, and a down electron on site $1$.
+
+This representation makes the common operations direct:
+\begin{align}
+n_{i\uparrow}(s) &= (b_\uparrow \mathbin{\texttt{>>}} i)\mathbin{\texttt{\&}}1,\\
+N_\uparrow(s) &= \operatorname{popcount}(b_\uparrow),\\
+N_{\mathrm{double}}(s) &=
+\operatorname{popcount}(b_\uparrow\mathbin{\texttt{\&}}b_\downarrow).
+\end{align}
+Python's integer \code{bit\_count()} supplies the popcount operation.
+
+\section{Enumeration and lookup}
+
+All length-$L$ integers with popcount $N_\uparrow$ are combined with all
+length-$L$ integers with popcount $N_\downarrow$.  A tuple stores the resulting
+states in deterministic order, while a dictionary maps each state back to its
+integer basis index.  The tuple gives $O(1)$ index-to-state lookup and the
+dictionary gives average $O(1)$ state-to-index lookup.
+
+The following first program verifies the combinatorial dimension, particle
+counts, and round-trip lookup.
+
+\lstinputlisting[caption={Enumerating a fixed sector.},label={lst:basis}]{code/step01_basis.py}
+
+\section{Validation before allocation}
+
+The basis constructor rejects $L<1$, particle numbers outside $[0,L]$, and
+noninteger inputs.  It computes Eq.~\eqref{eq:dimension} before allocating the
+state tuple.  A configurable dimension guard then refuses unreasonable
+sectors.  This ordering matters: a friendly error is better than allowing the
+operating system to terminate an overcommitted process.
+
+At half filling with $N_\uparrow=N_\downarrow=L/2$, growth is already severe:
+\begin{center}
+\begin{tabular}{rrr}
+\toprule
+$L$ & $(N_\uparrow,N_\downarrow)$ & $\basisdim$ \\
+\midrule
+6  & $(3,3)$ & 400 \\
+8  & $(4,4)$ & 4,900 \\
+10 & $(5,5)$ & 63,504 \\
+12 & $(6,6)$ & 853,776 \\
+\bottomrule
+\end{tabular}
+\end{center}
+The Hamiltonian need not be dense, but the basis and reverse-lookup dictionary
+must still fit in memory.
+
+\paragraph{Checkpoint.}
+Before writing any operator code, verify for several sectors that every state
+has the requested two popcounts, every state is unique, both lookup directions
+round-trip, and the dimension equals Eq.~\eqref{eq:dimension}.

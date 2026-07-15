@@ -1,0 +1,57 @@
+\chapter{Matrix-free action and Lanczos solving}
+\label{chap:lanczos}
+
+\section{Apply the same terms without storing them}
+
+Iterative eigensolvers only require products $y=Hx$.  For a vector
+$x_j=\braket{s_j}{\psi}$, the matrix-free loop is the sparse assembly loop with
+one change: instead of appending $H_{ij}$, accumulate
+\begin{equation}
+y_i \mathrel{+}= H_{ij}x_j.
+\end{equation}
+The basis and state-index dictionary are retained, but the CSR arrays are not.
+Correctness is checked by applying both implementations to the same random
+real and complex vectors.
+
+\lstinputlisting[caption={CSR versus matrix-free multiplication.},label={lst:matrixfree}]{code/step04_matrix_free.py}
+
+Using the same elementary hopping routine in both paths is intentional.  It
+reduces the risk that an optimized implementation and a reference
+implementation silently adopt different sign conventions.
+
+\section{Lanczos through a linear operator}
+
+SciPy's \code{LinearOperator} wraps the matrix-free action and supplies it to
+\code{eigsh}.  For a Hermitian Hamiltonian, requesting
+\code{which="SA"} returns the algebraically smallest eigenvalues.  A
+deterministic random initial vector is preferable to a constant vector because
+a constant vector may lie entirely within one symmetry block and miss a lower
+state in another block.
+
+ARPACK requires the number of requested eigenvalues $k$ to satisfy
+$k<\basisdim$.  Tiny sectors and complete-spectrum requests below a strict
+size threshold therefore use dense diagonalization.  Dense fallback is an
+edge-case convenience, not a route for production sectors.
+
+\section{Residuals are the final contract}
+
+An eigensolver's convergence flag is not enough.  Normalize every returned
+vector and recompute
+\begin{equation}
+r_a=\norm{H\psi_a-E_a\psi_a}_2
+\label{eq:residual}
+\end{equation}
+with the matrix-free action.  The default ARPACK tolerance is $10^{-10}$;
+typical absolute residuals in the tutorial examples are between $10^{-15}$
+and $10^{-10}$.
+
+\lstinputlisting[caption={Low-energy states and independent residual checks.},label={lst:groundstate}]{code/step05_ground_state.py}
+
+Degenerate eigenvalues require care.  Individual eigenvectors within a
+degenerate subspace are not unique, so compare the eigenvalue multiset or the
+projector onto the subspace rather than component-by-component vectors.
+
+\paragraph{Checkpoint.}
+Test CSR and matrix-free products on seeded random real and complex vectors,
+compare their low eigenvalues, and require a small independently recomputed
+residual for every eigenpair used in a numerical assertion.

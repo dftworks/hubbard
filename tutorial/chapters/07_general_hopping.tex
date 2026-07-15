@@ -1,0 +1,80 @@
+\chapter{General one-body hopping matrices}
+\label{chap:generalhopping}
+
+The nearest-neighbor chain is a specialization of
+\begin{equation}
+H(h)=\sum_{ij,\sigma}h_{ij}c_{i\sigma}^\dagger c_{j\sigma}
+ +U\sum_i n_{i\uparrow}n_{i\downarrow}.
+\label{eq:generalh}
+\end{equation}
+The interface convention is explicit: \code{h[i,j]} is the coefficient of
+$c_i^\dagger c_j$.  The same $h$ is applied to both spin species.
+
+\section{Validation and supported terms}
+
+The input must have shape $(L,L)$, contain finite numerical values, and satisfy
+\begin{equation}
+h=h^\dagger
+\end{equation}
+to relative and absolute tolerance $10^{-12}$.  Accepted roundoff-level
+asymmetry is projected away by storing $(h+h^\dagger)/2$.  The validated matrix
+is copied and made read-only, preventing caller mutation from changing a
+calculation after construction.
+
+The entries can describe
+\begin{itemize}
+\item arbitrary-range or graph hopping;
+\item real or complex Peierls phases;
+\item spin-independent onsite potentials on the diagonal;
+\item dense matrices produced by a one-particle basis transformation.
+\end{itemize}
+Each nonzero entry is evaluated through the same $c_i^\dagger c_j$ operator
+path used earlier.  CSR and matrix-free complex-Hermitian actions are therefore
+available without introducing a second sign convention.
+
+For a ring threaded by total phase $\Phi$, one convenient gauge is
+\begin{equation}
+h_{i+1,i}=-t e^{i\Phi/L},\qquad
+h_{i,i+1}=\left(h_{i+1,i}\right)^*.
+\end{equation}
+
+\lstinputlisting[caption={A complex flux model with longer-range hopping.},label={lst:generalh}]{code/step07_generic_hopping.py}
+
+Complex Hermitian matrices produce real eigenvalues but generally complex
+eigenvectors.  The generalized solver therefore preserves complex vector
+dtype, uses a deterministic complex initial vector, and recomputes complex
+residuals with the matrix-free action.
+
+\section{The orbital-rotation caveat}
+
+The general one-body interface is necessary for wavelets and orbital rotations,
+but it is not sufficient for the interacting model.  Let a unitary matrix $R$
+define new operators through
+\begin{equation}
+c_{i\sigma}=\sum_a R_{ia}d_{a\sigma}.
+\end{equation}
+The one-body matrix transforms simply:
+\begin{equation}
+h' = R^\dagger h R.
+\end{equation}
+The onsite interaction does not generally remain onsite.  Instead,
+\begin{align}
+U\sum_i n_{i\uparrow}n_{i\downarrow}
+&=\sum_{abcd}V_{abcd}
+d_{a\uparrow}^\dagger d_{b\uparrow}
+d_{c\downarrow}^\dagger d_{d\downarrow},\\
+V_{abcd}
+&=U\sum_i R^*_{ia}R_{ib}R^*_{ic}R_{id}.
+\label{eq:rotatedinteraction}
+\end{align}
+Therefore, passing only $h'$ to Eq.~\eqref{eq:generalh} while retaining a local
+$U$ usually defines a different physical model.  It is exact at $U=0$ and in
+special cases where the rotation preserves the local interaction.  A general
+four-index two-body operator is the required next layer for faithful wavelet,
+natural-orbital, or learned-orbital calculations at finite $U$.
+
+\paragraph{Checkpoint.}
+At $U=0$, compare the complete many-body spectrum obtained from a general $h$
+with sums of its one-particle eigenvalues.  For complex $h$, additionally test
+Hermiticity, CSR versus matrix-free action on complex random vectors, real
+eigenvalues, and small residuals.
